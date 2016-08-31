@@ -2,9 +2,9 @@
 #
 # Proxmox VZDump hook script for unthrottleing backups.
 #
-# Author: RobHost 2016
+# Author: RobHost
 # License: MIT
-# Version: 0.1, reldate 2016-08-30
+# Version: 0.2, reldate 2016-08-31
 # Repo: https://github.com/robhost/proxmox-scripts
 #
 # This script is intended to be used as a hook script for the Proxmox
@@ -17,6 +17,12 @@
 # set executable permission for the script file.
 # 
 # This script has been tested and used on Proxmox 4.2.
+#
+# Changelog:
+# 0.2, reldate 2016-08-31 - RobHost
+# - add noop output
+# 0.1, reldate 2016-08-30 - RobHost
+# - hello world
 
 
 # Find config directives of throttled storage for the VM with the given
@@ -93,7 +99,11 @@ storage_throttle() {
     remove)
       local storage=$(_get_throttled_storage "$vmid")
 
-      [[ -n "$storage" ]] || return 0
+      if [[ -z "$storage" ]]
+      then
+        echo "no throttled disks found to unthrottle"
+        return 0
+      fi
 
       mkdir -p "$(dirname "$storageconfpath")"
       echo "$storage" > "$storageconfpath"
@@ -101,7 +111,11 @@ storage_throttle() {
       _update_config "$vmid" $storage
       ;;
     restore)
-      [[ -e "$storageconfpath" ]] || return 0
+      if [[ ! -e "$storageconfpath" ]]
+      then
+        echo "no stored throttled disk configs found"
+        return 0
+      fi
 
       local storage="$(< "$storageconfpath")"
       _update_config "$vmid" $storage
