@@ -10,12 +10,12 @@
 # This script is intended to be used as a hook script for the Proxmox
 # VZDump utility. It removes disk throttles before the dump starts and
 # restores them after the dump has finished.
-# 
+#
 # In order to use it, use the configuration directive "script" of the
 # vzdump utility. This can be done for scheduled backups by putting
 # "script: /path/to/this/script" in /etc/vzdump.conf. Don't forget to
 # set executable permission for the script file.
-# 
+#
 # This script has been tested and used on Proxmox 4.2.
 #
 # Changelog:
@@ -59,7 +59,7 @@ _remove_throttle() {
       unset sopts_a[$i]
     done
 
-    local sopts="${sopts_a[*]}" 
+    local sopts="${sopts_a[*]}"
     echo "$sid:${sopts// /,}"
   done
 }
@@ -150,7 +150,7 @@ vzdump_hook() {
       local tarfile="$TARFILE"
       ;;&
     log-end)
-      local logfile="$LOGFILE" 
+      local logfile="$LOGFILE"
       ;;&
 
     # do work
