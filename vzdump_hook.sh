@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Proxmox VZDump hook script for unthrottleing backups.
+# Proxmox VZDump hook script for managing disk throttles for backups.
 #
 # Author: RobHost
 # License: MIT
@@ -8,21 +8,41 @@
 # Repo: https://github.com/robhost/proxmox-scripts
 #
 # This script is intended to be used as a hook script for the Proxmox
-# VZDump utility. It removes disk throttles before the dump starts and
-# restores them after the dump has finished.
+# VZDump utility. It applies throttling for backup or removes all disk
+# throttles before the dump starts and restores the original config
+# after the dump has finished.
 #
 # In order to use it, use the configuration directive "script" of the
 # vzdump utility. This can be done for scheduled backups by putting
 # "script: /path/to/this/script" in /etc/vzdump.conf. Don't forget to
 # set executable permission for the script file.
 #
-# This script has been tested and used on Proxmox 4.2.
+# If you don't put a vzdump_hook.conf next to the script, all throttles
+# will be removed. If you want to raise the throttle for the backup,
+# put the desired config options into the conf file, for instance:
+#
+#  iops_rd=1000
+#  iops_rd_max=10000
+#
+#
+# This script has been tested and used on Proxmox 4.3 and 4.2.
 #
 # Changelog:
+# 0.3, reldate 2017-02-10 - RobHost
+# - add support for backup throttle
 # 0.2, reldate 2016-08-31 - RobHost
 # - add noop output
 # 0.1, reldate 2016-08-30 - RobHost
 # - hello world
+
+declare -a BACKUP_THROTTLE
+
+CONFFIGPATH="$(dirname "$(realpath "$BASH_SOURCE")")/vzdump_hook.conf"
+
+if [[ -r $CONFFIGPATH ]]
+then
+  BACKUP_THROTTLE=($(< "$CONFFIGPATH"))
+fi
 
 
 # Find config directives of throttled storage for the VM with the given
@@ -44,7 +64,7 @@ _get_throttled_storage() {
 # with spaces removed, as retuned by _get_throttled_storage.
 # Echoes in the same format with throttling options removed.
 
-_remove_throttle() {
+_apply_backup_throttle() {
   local storage="$1"
 
   for storage in $storage
@@ -57,6 +77,12 @@ _remove_throttle() {
     do
       [[ "${sopts_a[$i]}" =~ ^(iops|mbps) ]] || continue
       unset sopts_a[$i]
+    done
+
+    for j in ${BACKUP_THROTTLE[@]}
+    do
+      [[ ! ${sopts_a[@]} =~ \ ${j%=*}= ]] || continue
+      sopts_a+=("$j")
     done
 
     local sopts="${sopts_a[*]}"
@@ -107,7 +133,7 @@ storage_throttle() {
 
       mkdir -p "$(dirname "$storageconfpath")"
       echo "$storage" > "$storageconfpath"
-      storage=$(_remove_throttle "$storage")
+      storage=$(_apply_backup_throttle "$storage")
       _update_config "$vmid" $storage
       ;;
     restore)
